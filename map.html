@@ -42,7 +42,7 @@
 
 <script>
 (function() {
-    var map = L.map('map').setView([35.681236, 139.767125], 10);
+    var map = L.map('map').setView([36.0, 138.0], 5);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; OpenStreetMap contributors'
@@ -52,33 +52,49 @@
     window.selectedMapPoints = [];
     var allPoints = [];
 
-    // 簡易的な郵便番号上3桁・都道府県別の拠点検索テーブル (超高速)
-    function getApproxLocation(zip, addr) {
-        if (zip) {
-            var z = String(zip).replace(/[^0-9]/g, '');
-            if (z.length >= 3) {
-                var prefix = parseInt(z.substring(0, 3));
-                // 東京周辺
-                if (prefix >= 100 && prefix <= 150) return { lat: 35.6895 + (Math.random()-0.5)*0.05, lng: 139.6917 + (Math.random()-0.5)*0.05 };
-                // 埼玉
-                if (prefix >= 330 && prefix <= 369) return { lat: 35.8617 + (Math.random()-0.5)*0.08, lng: 139.6455 + (Math.random()-0.5)*0.08 };
-                // 千葉
-                if (prefix >= 260 && prefix <= 299) return { lat: 35.6074 + (Math.random()-0.5)*0.08, lng: 140.1065 + (Math.random()-0.5)*0.08 };
-                // 神奈川
-                if (prefix >= 210 && prefix <= 259) return { lat: 35.4437 + (Math.random()-0.5)*0.08, lng: 139.6380 + (Math.random()-0.5)*0.08 };
-                // 茨城・栃木・群馬
-                if (prefix >= 300 && prefix <= 329) return { lat: 36.3418 + (Math.random()-0.5)*0.1, lng: 140.4468 + (Math.random()-0.5)*0.1 };
-                if (prefix >= 370 && prefix <= 379) return { lat: 36.3907 + (Math.random()-0.5)*0.1, lng: 139.0604 + (Math.random()-0.5)*0.1 };
+    // 都道府県・郵便番号 全国座標マップ
+    var prefCoords = {
+        "北海道": [43.0642, 141.3469], "青森": [40.8244, 140.7400], "岩手": [39.7036, 141.1527],
+        "宮城": [38.2688, 140.8719], "秋田": [39.7186, 140.1024], "山形": [38.2404, 140.3633],
+        "福島": [37.7500, 140.4678], "茨城": [36.3418, 140.4468], "栃木": [36.5657, 139.8836],
+        "群馬": [36.3907, 139.0604], "埼玉": [35.8617, 139.6455], "千葉": [35.6074, 140.1065],
+        "東京": [35.6895, 139.6917], "神奈川": [35.4437, 139.6380], "新潟": [37.9022, 139.0236],
+        "富山": [36.6959, 137.2137], "石川": [36.5947, 136.6256], "福井": [36.0652, 136.2219],
+        "山梨": [35.6642, 138.5684], "長野": [36.6513, 138.1810], "岐阜": [35.3912, 136.7223],
+        "静岡": [34.9769, 138.3831], "愛知": [35.1802, 136.9066], "三重": [34.7303, 136.5086],
+        "滋賀": [35.0045, 135.8686], "京都": [35.0211, 135.7556], "大阪": [34.6937, 135.5023],
+        "兵庫": [34.6913, 135.1830], "奈良": [34.6853, 135.8327], "和歌山": [34.2260, 135.1675],
+        "鳥取": [35.5011, 134.2351], "島根": [35.4723, 133.0505], "岡山": [34.6618, 133.9344],
+        "広島": [34.3963, 132.4594], "山口": [34.1858, 131.4714], "徳島": [34.0657, 134.5593],
+        "香川": [34.3401, 134.0433], "愛媛": [33.8416, 132.7657], "高知": [33.5597, 133.5311],
+        "福岡": [33.6064, 130.4183], "佐賀": [33.2635, 130.3009], "長崎": [32.7503, 129.8777],
+        "熊本": [32.7898, 130.7417], "大分": [33.2382, 131.6126], "宮崎": [31.9111, 131.4239],
+        "鹿児島": [31.5602, 130.5581], "沖縄": [26.2124, 127.6809]
+    };
+
+    function getNationalLocation(zip, addr) {
+        // 住所から都道府県判定
+        if (addr) {
+            for (var key in prefCoords) {
+                if (addr.includes(key)) {
+                    var base = prefCoords[key];
+                    return { lat: base[0] + (Math.random()-0.5)*0.25, lng: base[1] + (Math.random()-0.5)*0.25 };
+                }
             }
         }
-        // 都道府県名からのおおよそ
-        if (addr) {
-            if (addr.includes("埼玉")) return { lat: 35.8617 + (Math.random()-0.5)*0.1, lng: 139.6455 + (Math.random()-0.5)*0.1 };
-            if (addr.includes("東京")) return { lat: 35.6895 + (Math.random()-0.5)*0.1, lng: 139.6917 + (Math.random()-0.5)*0.1 };
-            if (addr.includes("千葉")) return { lat: 35.6074 + (Math.random()-0.5)*0.1, lng: 140.1065 + (Math.random()-0.5)*0.1 };
-            if (addr.includes("神奈川")) return { lat: 35.4437 + (Math.random()-0.5)*0.1, lng: 139.6380 + (Math.random()-0.5)*0.1 };
+        // 郵便番号（上1〜2桁）から全国判定
+        if (zip) {
+            var z = String(zip).replace(/[^0-9]/g, '');
+            if (z.length >= 2) {
+                var p2 = parseInt(z.substring(0, 2));
+                if (p2 >= 80 && p2 <= 83) return { lat: 33.6064 + (Math.random()-0.5)*0.2, lng: 130.4183 + (Math.random()-0.5)*0.2 }; // 福岡周辺
+                if (p2 >= 86 && p2 <= 86) return { lat: 32.7898 + (Math.random()-0.5)*0.2, lng: 130.7417 + (Math.random()-0.5)*0.2 }; // 熊本
+                if (p2 >= 84 && p2 <= 85) return { lat: 33.2635 + (Math.random()-0.5)*0.2, lng: 130.3009 + (Math.random()-0.5)*0.2 }; // 佐賀・長崎
+                if (p2 >= 98 && p2 <= 98) return { lat: 38.2688 + (Math.random()-0.5)*0.2, lng: 140.8719 + (Math.random()-0.5)*0.2 }; // 宮城
+                if (p2 >= 53 && p2 <= 59) return { lat: 34.6937 + (Math.random()-0.5)*0.2, lng: 135.5023 + (Math.random()-0.5)*0.2 }; // 大阪・兵庫
+            }
         }
-        return { lat: 35.6812 + (Math.random()-0.5)*0.1, lng: 139.7671 + (Math.random()-0.5)*0.1 };
+        return { lat: 35.6895 + (Math.random()-0.5)*0.2, lng: 139.6917 + (Math.random()-0.5)*0.2 };
     }
 
     var csvFiles = ['data1.csv', 'data2.csv', 'data3.csv'];
@@ -106,7 +122,7 @@
 
                             if (!addr && !zip) return;
 
-                            var coords = getApproxLocation(zip, addr);
+                            var coords = getNationalLocation(zip, addr);
 
                             var item = { lat: coords.lat, lng: coords.lng, name: name, addr: addr, price: price, tsubo: tsubo };
                             allPoints.push(item);
