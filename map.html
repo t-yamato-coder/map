@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>エリア囲み集計マップ</title>
+    
+    <!-- Leaflet & Draw & Turf.js CSS / JS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.css"/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.1.0/MarkerCluster.css"/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.1.0/MarkerCluster.Default.css"/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.2/leaflet.draw.css"/>
+
+    <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.js"></script>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.1.0/leaflet.markercluster.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.2/leaflet.draw.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+
+    <style>
+        html, body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            font-family: sans-serif;
+        }
+        #map {
+            width: 100%;
+            height: 100vh;
+        }
+        .info-panel-control {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 12px 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.25);
+            width: 230px;
+            font-size: 12px;
+            line-height: 1.4;
+            color: #333;
+        }
+        .info-panel-control h4 {
+            margin: 0 0 6px 0;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        .map-summary-btn {
+            width: 100%;
+            padding: 8px;
+            background: #28a745;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            margin-top: 8px;
+        }
+    </style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<script>
+(function() {
+    var map = L.map('map').setView([33.59, 130.40], 11);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    // ★ ここに表示したい物件データを登録します
+    var points = [
+        {"lat": 33.631771, "lng": 130.516357, "name": "福岡県糟屋郡篠栗町津波黒3丁目の貸地【384坪】", "tsubo": 1169.0, "addr": "福岡県糟屋郡篠栗町津波黒３丁目6-19", "price": "450000.0"},
+        {"lat": 33.570911, "lng": 130.350967, "name": "福岡県福岡市早良区荒江3丁目の貸倉庫【87坪】", "tsubo": 2955.0, "addr": "福岡県福岡市早良区荒江３丁目22-16", "price": "257400.0"},
+        {"lat": 33.571323, "lng": 130.350845, "name": "福岡県福岡市早良区原1丁目の貸倉庫【119坪】", "tsubo": 3798.0, "addr": "福岡県福岡市早良区原１丁目11-11", "price": "455000.0"},
+        {"lat": 33.549873, "lng": 130.39679, "name": "福岡県福岡市南区長住2丁目の貸店舗【121坪】", "tsubo": 7215.0, "addr": "福岡県福岡市南区長住２丁目22", "price": "880000.0"},
+        {"lat": 33.593021, "lng": 130.363842, "name": "福岡県福岡市早良区百道1丁目の貸店舗【50坪】", "tsubo": 6000.0, "addr": "福岡県福岡市早良区百道１丁目", "price": "300000.0"},
+        {"lat": 33.585100, "lng": 130.421000, "name": "福岡県福岡市博多区博多駅前の貸オフィス【30坪】", "tsubo": 10000.0, "addr": "福岡県福岡市博多区博多駅前２丁目", "price": "300000.0"},
+        {"lat": 33.590000, "lng": 130.400000, "name": "福岡県福岡市中央区天神の貸店舗【40坪】", "tsubo": 15000.0, "addr": "福岡県福岡市中央区天神1丁目", "price": "600000.0"},
+        {"lat": 33.550000, "lng": 130.430000, "name": "福岡県福岡市博多区竹下の貸倉庫【200坪】", "tsubo": 4000.0, "addr": "福岡県福岡市博多区竹下", "price": "800000.0"}
+    ];
+
+    var markers = L.markerClusterGroup();
+    window.selectedMapPoints = [];
+
+    points.forEach(function(p) {
+        var marker = L.marker([p.lat, p.lng]);
+        var popup = '<b>' + p.name + '</b><br>住所: ' + p.addr + '<br>賃料: ' + Number(p.price).toLocaleString() + '円<br>坪単価: ' + Number(p.tsubo).toLocaleString() + '円';
+        marker.bindPopup(popup);
+        markers.addLayer(marker);
+    });
+    map.addLayer(markers);
+
+    if (markers.getBounds().isValid()) {
+        map.fitBounds(markers.getBounds(), { padding: [30, 30] });
+    }
+
+    var SummaryControl = L.Control.extend({
+        options: { position: 'topright' },
+        onAdd: function () {
+            var div = L.DomUtil.create('div', 'info-panel-control');
+            L.DomEvent.disableClickPropagation(div);
+            div.innerHTML = `
+                <h4>🎯 エリア囲み集計</h4>
+                <p style="color: #666; font-size: 10px; margin: 0 0 6px 0;">左上のツール（図形・円など）で指定してください</p>
+                <div id="results-content" style="display: none; background: #f8f9fa; padding: 8px; border-radius: 4px;">
+                    <div>対象件数: <strong id="s-count">0</strong> 件</div>
+                    <div>平均坪単価: <strong id="s-avg" style="color: #d9534f; font-size: 14px;">0</strong> 円</div>
+                    <button class="map-summary-btn" id="csv-btn">CSV出力</button>
+                    <ul id="s-list" style="padding-left: 16px; margin: 6px 0 0 0; max-height: 120px; overflow-y: auto; font-size: 10px;"></ul>
+                </div>
+            `;
+            return div;
+        }
+    });
+    map.addControl(new SummaryControl());
+
+    var drawnItems = new L.FeatureGroup();
+    map.addLayer(drawnItems);
+    var drawControl = new L.Control.Draw({
+        draw: { polygon: true, rectangle: true, circle: true, polyline: false, circlemarker: false, marker: false },
+        edit: { featureGroup: drawnItems, remove: true }
+    });
+    map.addControl(drawControl);
+
+    map.on(L.Draw.Event.CREATED, function (e) {
+        var layer = e.layer;
+        drawnItems.clearLayers();
+        drawnItems.addLayer(layer);
+        var geoJson = (e.layerType === 'circle') 
+            ? turf.circle([layer.getLatLng().lng, layer.getLatLng().lat], layer.getRadius() / 1000)
+            : layer.toGeoJSON();
+        calculateInArea(geoJson);
+    });
+
+    map.on(L.Draw.Event.DELETED, function () {
+        document.getElementById('results-content').style.display = 'none';
+        window.selectedMapPoints = [];
+    });
+
+    function calculateInArea(polygonGeoJson) {
+        window.selectedMapPoints = [];
+        var totalTsubo = 0, validCount = 0;
+        points.forEach(function(p) {
+            if (turf.booleanPointInPolygon(turf.point([p.lng, p.lat]), polygonGeoJson)) {
+                window.selectedMapPoints.push(p);
+                var tVal = parseFloat(p.tsubo);
+                if (tVal > 0) { totalTsubo += tVal; validCount++; }
+            }
+        });
+        document.getElementById('s-count').innerText = window.selectedMapPoints.length;
+        document.getElementById('s-avg').innerText = (validCount > 0 ? Math.round(totalTsubo / validCount) : 0).toLocaleString();
+        var listEl = document.getElementById('s-list');
+        listEl.innerHTML = '';
+        window.selectedMapPoints.forEach(function(sp) {
+            var li = document.createElement('li');
+            li.innerText = sp.name;
+            listEl.appendChild(li);
+        });
+        document.getElementById('results-content').style.display = 'block';
+    }
+
+    document.addEventListener('click', function(e) {
+        if(e.target && e.target.id === 'csv-btn') {
+            if (!window.selectedMapPoints || window.selectedMapPoints.length === 0) return;
+            var csv = '\uFEFF物件名,住所,賃料,坪単価,緯度,経度\n';
+            window.selectedMapPoints.forEach(function(p) {
+                csv += '"' + p.name.replace(/"/g, '""') + '","' + p.addr.replace(/"/g, '""') + '",' + p.price + ',' + p.tsubo + ',' + p.lat + ',' + p.lng + '\n';
+            });
+            var link = document.createElement("a");
+            link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+            link.download = "集計物件一覧.csv";
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    });
+})();
+</script>
+</body>
+</html>
