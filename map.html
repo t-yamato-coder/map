@@ -54,32 +54,44 @@
     window.selectedMapPoints = [];
     var allPoints = [];
 
-    // 国土地理院等のジオコーディングAPIで住所から座標を取得する関数
-    async function getLatLngFromAddress(address) {
+    // 郵便番号APIで超高速に座標を取得する関数
+    async function getLatLngFromZip(zip) {
+        if (!zip) return null;
+        var cleanZip = String(zip).replace(/[^0-9]/g, '');
+        if (cleanZip.length < 7) return null;
         try {
-            var response = await fetch('https://msearch.gsi.go.jp/address-search/Query?q=' + encodeURIComponent(address));
+            var response = await fetch('https://zipcloud.ibsnet.co.jp/api/search?zipcode=' + cleanZip);
             var data = await response.json();
-            if (data && data.length > 0) {
-                var lng = data[0].geometry.coordinates[0];
-                var lat = data[0].geometry.coordinates[1];
-                return { lat: lat, lng: lng };
+            if (data && data.results && data.results.length > 0) {
+                // HeartRails等または基本位置変換
+                var res = data.results[0];
+                var address = res.address1 + res.address2 + res.address3;
+                var geoRes = await fetch('https://msearch.gsi.go.jp/address-search/Query?q=' + encodeURIComponent(address));
+                var geoData = await geoRes.json();
+                if (geoData && geoData.length > 0) {
+                    return {
+                        lat: geoData[0].geometry.coordinates[1],
+                        lng: geoData[0].geometry.coordinates[0]
+                    };
+                }
             }
-        } catch (e) {
-            console.error('住所変換エラー:', address, e);
-        }
+        } catch (e) {}
         return null;
     }
 
-    // 読み込むCSVファイルのリスト（3拠点分）
     var csvFiles = ['data1.csv', 'data2.csv', 'data3.csv'];
 
-    async function loadAllCSVs() {
-        for (var i = 0; i < csvFiles.length; i++) {
+    async function loadCSVs() {
+        for (var file of csvFiles) {
             try {
-                var response = await fetch(csvFiles[i]);
+                var response = await fetch(file);
                 if (!response.ok) continue;
-                var text = await response.text();
-                
+
+                // Shift-JIS対応のパース
+                var buffer = await response.arrayBuffer();
+                var decoder = new TextDecoder('shift-jis');
+                var text = decoder.decode(buffer);
+
                 Papa.parse(text, {
                     header: true,
                     skipEmptyLines: true,
@@ -87,22 +99,28 @@
                         for (var row of results.data) {
                             var name = row['物件名'] || '';
                             var addr = row['所在地'] || '';
+                            var zip = row['郵便番号'] || '';
                             var price = parseFloat(row['賃料']) || 0;
                             var tsubo = parseFloat(row['坪単価(代表)']) || 0;
 
-                            if (!addr) continue;
+                            if (!addr && !zip) continue;
 
-                            // 住所から緯度経度を取得
-                            var coords = await getLatLngFromAddress(addr);
+                            // 郵便番号優先で高速取得
+                            var coords = await getLatLngFromZip(zip);
+                            
+                            // 郵便番号で取れなかった場合のみ住所検索
+                            if (!coords && addr) {
+                                try {
+                                    var gRes = await fetch('https://msearch.gsi.go.jp/address-search/Query?q=' + encodeURIComponent(addr.substring(0, 10)));
+                                    var gData = await gRes.json();
+                                    if (gData && gData.length > 0) {
+                                        coords = { lat: gData[0].geometry.coordinates[1], lng: gData[0].geometry.coordinates[0] };
+                                    }
+                                } catch(e){}
+                            }
+
                             if (coords) {
-                                var item = {
-                                    lat: coords.lat,
-                                    lng: coords.lng,
-                                    name: name,
-                                    addr: addr,
-                                    price: price,
-                                    tsubo: tsubo
-                                };
+                                var item = { lat: coords.lat, lng: coords.lng, name: name, addr: addr, price: price, tsubo: tsubo };
                                 allPoints.push(item);
 
                                 var marker = L.marker([item.lat, item.lng]);
@@ -111,18 +129,19 @@
                                 markers.addLayer(marker);
                             }
                         }
+                        map.addLayer(markers);
                         if (allPoints.length > 0 && markers.getBounds().isValid()) {
                             map.fitBounds(markers.getBounds(), { padding: [30, 30] });
                         }
                     }
                 });
-            } catch (err) {
-                console.log(csvFiles[i] + ' の読み込みをスキップしました');
+            } catch (e) {
+                console.log(file + ' 読み込みエラー', e);
             }
         }
     }
 
-    loadAllCSVs();
+    loadCSVs();
 
     var SummaryControl = L.Control.extend({
         options: { position: 'topright' },
