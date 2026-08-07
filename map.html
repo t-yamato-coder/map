@@ -35,6 +35,8 @@
             border: none; border-radius: 4px; cursor: pointer; font-weight: bold; margin-top: 8px;
         }
     </style>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
+<script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
 </head>
 <body>
 
@@ -227,6 +229,10 @@
         }
     });
 })();
+    L.Control.geocoder({
+    defaultMarkGeocode: true,
+    placeholder: "住所・地名で検索..."
+}).addTo(map);
 </script>
 </body>
 </html>
