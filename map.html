@@ -247,5 +247,30 @@ setTimeout(function() {
     }
 }, 1000);
 </script>
+    <!-- 検索機能プラグインの読み込み -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
+<script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
+
+<!-- 検索バーを地図にセットするコード -->
+<script>
+window.addEventListener('load', function() {
+    setTimeout(function() {
+        var targetMap = null;
+        for (var key in window) {
+            if (window[key] && window[key] instanceof L.Map) {
+                targetMap = window[key];
+                break;
+            }
+        }
+        if (targetMap) {
+            L.Control.geocoder({
+                defaultMarkGeocode: true,
+                placeholder: "住所・地名で検索...",
+                errorMessage: "見つかりませんでした。"
+            }).addTo(targetMap);
+        }
+    }, 1500);
+});
+</script>
 </body>
 </html>
