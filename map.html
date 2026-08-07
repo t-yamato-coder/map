@@ -9,12 +9,16 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.1.0/MarkerCluster.css"/>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.1.0/MarkerCluster.Default.css"/>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.2/leaflet.draw.css"/>
+    <!-- 検索機能のCSS/JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
 
     <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.1.0/leaflet.markercluster.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.2/leaflet.draw.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <!-- 検索機能のJS -->
+    <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
 
     <style>
         html, body { width: 100%; height: 100%; margin: 0; padding: 0; font-family: sans-serif; }
@@ -35,8 +39,6 @@
             border: none; border-radius: 4px; cursor: pointer; font-weight: bold; margin-top: 8px;
         }
     </style>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
-<script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
 </head>
 <body>
 
@@ -48,6 +50,13 @@
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    // 住所・地名検索窓の追加
+    L.Control.geocoder({
+        defaultMarkGeocode: true,
+        placeholder: "住所・地名で検索...",
+        errorMessage: "見つかりませんでした。"
     }).addTo(map);
 
     var markers = L.markerClusterGroup();
@@ -75,7 +84,6 @@
     };
 
     function getNationalLocation(zip, addr) {
-        // 住所から都道府県判定
         if (addr) {
             for (var key in prefCoords) {
                 if (addr.includes(key)) {
@@ -84,16 +92,15 @@
                 }
             }
         }
-        // 郵便番号（上1〜2桁）から全国判定
         if (zip) {
             var z = String(zip).replace(/[^0-9]/g, '');
             if (z.length >= 2) {
                 var p2 = parseInt(z.substring(0, 2));
-                if (p2 >= 80 && p2 <= 83) return { lat: 33.6064 + (Math.random()-0.5)*0.2, lng: 130.4183 + (Math.random()-0.5)*0.2 }; // 福岡周辺
-                if (p2 >= 86 && p2 <= 86) return { lat: 32.7898 + (Math.random()-0.5)*0.2, lng: 130.7417 + (Math.random()-0.5)*0.2 }; // 熊本
-                if (p2 >= 84 && p2 <= 85) return { lat: 33.2635 + (Math.random()-0.5)*0.2, lng: 130.3009 + (Math.random()-0.5)*0.2 }; // 佐賀・長崎
-                if (p2 >= 98 && p2 <= 98) return { lat: 38.2688 + (Math.random()-0.5)*0.2, lng: 140.8719 + (Math.random()-0.5)*0.2 }; // 宮城
-                if (p2 >= 53 && p2 <= 59) return { lat: 34.6937 + (Math.random()-0.5)*0.2, lng: 135.5023 + (Math.random()-0.5)*0.2 }; // 大阪・兵庫
+                if (p2 >= 80 && p2 <= 83) return { lat: 33.6064 + (Math.random()-0.5)*0.2, lng: 130.4183 + (Math.random()-0.5)*0.2 };
+                if (p2 >= 86 && p2 <= 86) return { lat: 32.7898 + (Math.random()-0.5)*0.2, lng: 130.7417 + (Math.random()-0.5)*0.2 };
+                if (p2 >= 84 && p2 <= 85) return { lat: 33.2635 + (Math.random()-0.5)*0.2, lng: 130.3009 + (Math.random()-0.5)*0.2 };
+                if (p2 >= 98 && p2 <= 98) return { lat: 38.2688 + (Math.random()-0.5)*0.2, lng: 140.8719 + (Math.random()-0.5)*0.2 };
+                if (p2 >= 53 && p2 <= 59) return { lat: 34.6937 + (Math.random()-0.5)*0.2, lng: 135.5023 + (Math.random()-0.5)*0.2 };
             }
         }
         return { lat: 35.6895 + (Math.random()-0.5)*0.2, lng: 139.6917 + (Math.random()-0.5)*0.2 };
@@ -229,48 +236,6 @@
         }
     });
 })();
-    // 自動で地図を探して住所検索機能を追加するコード
-setTimeout(function() {
-    var targetMap = null;
-    for (var key in window) {
-        if (window[key] instanceof L.Map) {
-            targetMap = window[key];
-            break;
-        }
-    }
-    if (targetMap) {
-        L.Control.geocoder({
-            defaultMarkGeocode: true,
-            placeholder: "住所・地名で検索...",
-            errorMessage: "見つかりませんでした。"
-        }).addTo(targetMap);
-    }
-}, 1000);
-</script>
-    <!-- 検索機能プラグインの読み込み -->
-<link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
-<script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
-
-<!-- 検索バーを地図にセットするコード -->
-<script>
-window.addEventListener('load', function() {
-    setTimeout(function() {
-        var targetMap = null;
-        for (var key in window) {
-            if (window[key] && window[key] instanceof L.Map) {
-                targetMap = window[key];
-                break;
-            }
-        }
-        if (targetMap) {
-            L.Control.geocoder({
-                defaultMarkGeocode: true,
-                placeholder: "住所・地名で検索...",
-                errorMessage: "見つかりませんでした。"
-            }).addTo(targetMap);
-        }
-    }, 1500);
-});
 </script>
 </body>
 </html>
